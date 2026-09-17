@@ -38,14 +38,24 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android Platforms and Build-Tools
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" || true
 
       - name: Prepare Keystore & Environment
         run: |
           if [ -f "debug.keystore.base64" ]; then
             echo "Decoding debug keystore..."
             base64 -d debug.keystore.base64 > debug.keystore
+          fi
+
+          if [ ! -f "debug.keystore" ]; then
+            echo "Generating fallback debug.keystore..."
+            keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
 
           if [ ! -f ".env" ]; then
@@ -58,10 +68,16 @@ jobs:
             echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
           fi
 
-          chmod +x gradlew
+          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+            echo "Downloading gradle-wrapper.jar fallback..."
+            curl -Lo gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v9.3.1/gradle/wrapper/gradle-wrapper.jar || true
+          fi
+
+          chmod +x gradlew || true
 
       - name: Build APK with Gradle
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Prepare Release Assets
         id: prepare_assets
@@ -69,7 +85,7 @@ jobs:
           mkdir -p release-output
           TAG="${{ github.event.inputs.tag_name || github.ref_name }}"
           APK_NAME="BASOKA-${TAG}.apk"
-          cp app/build/outputs/apk/debug/app-debug.apk "release-output/${APK_NAME}"
+          find app/build/outputs/apk/debug/ -name "*.apk" -exec cp {} "release-output/${APK_NAME}" \;
           echo "apk_name=${APK_NAME}" >> $GITHUB_OUTPUT
           echo "apk_path=release-output/${APK_NAME}" >> $GITHUB_OUTPUT
           echo "tag_name=${TAG}" >> $GITHUB_OUTPUT
@@ -95,3 +111,4 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

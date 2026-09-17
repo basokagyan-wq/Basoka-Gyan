@@ -16,3 +16,10 @@
 local.properties
 .env
 debug.keystore
+
+# Keep Gradle Wrapper files so GitHub Actions can run ./gradlew
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+!gradlew
+!gradlew.bat
+

@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -26,39 +26,55 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android Platforms and Build-Tools
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" || true
 
       - name: Prepare Keystore & Environment
         run: |
-          # Decode debug keystore if base64 file exists
+          # 1. Decode debug keystore if base64 file exists or create a fallback debug keystore
           if [ -f "debug.keystore.base64" ]; then
-            echo "Decoding debug keystore..."
+            echo "Decoding debug keystore from base64..."
             base64 -d debug.keystore.base64 > debug.keystore
           fi
 
-          # Prepare .env file for build configuration
+          if [ ! -f "debug.keystore" ]; then
+            echo "Generating fallback debug.keystore..."
+            keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+          # 2. Prepare .env file for secrets gradle plugin
           if [ ! -f ".env" ]; then
             echo "Creating .env from .env.example..."
             cp .env.example .env
           fi
 
-          # Inject GEMINI_API_KEY from GitHub Secrets if provided
+          # 3. Inject GEMINI_API_KEY from GitHub Secrets if configured in repository
           if [ -n "${{ secrets.GEMINI_API_KEY }}" ]; then
             echo "Injecting GEMINI_API_KEY secret into .env..."
             echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
           fi
 
-          # Ensure gradlew has executable permissions
-          chmod +x gradlew
+          # 4. Ensure Gradle Wrapper exists & executable
+          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+            echo "Downloading gradle-wrapper.jar fallback..."
+            curl -Lo gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v9.3.1/gradle/wrapper/gradle-wrapper.jar || true
+          fi
+
+          chmod +x gradlew || true
 
       - name: Build APK with Gradle
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Locate and Rename APK
         run: |
           mkdir -p release-artifacts
-          cp app/build/outputs/apk/debug/app-debug.apk release-artifacts/BASOKA-Assistant-debug.apk
+          find app/build/outputs/apk/debug/ -name "*.apk" -exec cp {} release-artifacts/BASOKA-Assistant-debug.apk \;
           echo "APK created successfully:"
           ls -lh release-artifacts/BASOKA-Assistant-debug.apk
 
@@ -75,3 +91,4 @@ jobs:
           echo "دەتوانیت فایلی ئەپەکە لە بەشی **Artifacts** داونلۆد بکەیت." >> $GITHUB_STEP_SUMMARY
           echo "- **ناوی فایل:** BASOKA-Assistant-debug.apk" >> $GITHUB_STEP_SUMMARY
           echo "- **بەستەری ڕاستەوخۆ:** لە ژێر تابلۆی 'Artifacts' کلیک لەسەر 'BASOKA-Debug-APK' بکە." >> $GITHUB_STEP_SUMMARY
+
