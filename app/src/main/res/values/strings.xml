@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">BASOKA</string>
+    <string name="accessibility_service_name">خزمەتگوزاری کۆنترۆڵی BASOKA</string>
+    <string name="accessibility_service_description">یاریدەدەری زیرەکی BASOKA بۆ یارمەتیدان لە خوێندنەوەی دەقی شاشە، گەڕانەوە، دەستپێک، و پەنجەنان بە دوگمەکان لەسەر فەرمانی بەکارهێنەر.</string>
+</resources>

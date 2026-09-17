@@ -1,0 +1,8 @@
+{
+  "name": "BASOKA",
+  "description": "Personal AI operating assistant in Sorani Kurdish for phone control, voice commands, and smart tasks",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
